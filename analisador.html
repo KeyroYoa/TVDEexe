@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analisador TVDE</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #0f0f0f;
+    color: #e8eaed;
+    padding: 16px;
+    min-height: 100vh;
+  }
+  h1 { font-size: 24px; color: #fff; margin-bottom: 4px; }
+  .sub { color: #9aa0a6; font-size: 13px; margin-bottom: 20px; }
+  .container { max-width: 1200px; margin: 0 auto; }
+  .card {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .card h2 { color: #fff; font-size: 17px; margin-bottom: 12px; }
+  .card h3 { color: #bdc1c6; font-size: 14px; margin: 12px 0 8px; }
+  label { display: block; color: #bdc1c6; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  input, select {
+    padding: 10px;
+    border: 1.5px solid #333;
+    border-radius: 10px;
+    background: #0f0f0f;
+    color: #e8eaed;
+    font-size: 14px;
+    width: 100%;
+  }
+  input:focus, select:focus { border-color: #3b82f6; outline: none; }
+  button {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .btn-primary { background: #3b82f6; color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-secondary { background: #2a2a2a; color: #e8eaed; border: 1.5px solid #333; }
+  .btn-secondary:hover { background: #333; }
+  .btn-success { background: #1a3a1a; color: #86efac; border: 1.5px solid #2a5a2a; }
+  .btn-success:hover { background: #2a4a2a; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+  .row > div { flex: 1; min-width: 150px; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 12px; }
+  .stat {
+    background: #141414;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    padding: 12px;
+  }
+  .stat .rot { color: #9aa0a6; font-size: 12px; font-weight: 500; }
+  .stat .val { color: #fff; font-size: 20px; font-weight: 700; margin-top: 4px; }
+  .stat.uber .val { color: #fff; }
+  .stat.bolt .val { color: #34d186; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 13px;
+  }
+  th, td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid #2a2a2a;
+  }
+  th { color: #9aa0a6; font-weight: 600; font-size: 12px; text-transform: uppercase; }
+  td { color: #e8eaed; }
+  tr:hover { background: #1f1f1f; cursor: pointer; }
+  tr.selected { background: #1e3a5f; }
+  tr.folga td { color: #9aa0a6; font-style: italic; }
+
+  .grafico {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 200px;
+    padding: 10px 0;
+    border-bottom: 2px solid #333;
+    margin-bottom: 10px;
+    overflow-x: auto;
+  }
+  .barra {
+    min-width: 18px;
+    background: #3b82f6;
+    border-radius: 4px 4px 0 0;
+    position: relative;
+    transition: background 0.2s;
+    cursor: pointer;
+  }
+  .barra:hover { background: #60a5fa; }
+  .barra.uber { background: #ffffff; }
+  .barra.bolt { background: #34d186; }
+  .barra .label {
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: #9aa0a6;
+    white-space: nowrap;
+  }
+
+  .pie-wrap { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+  .pie { width: 180px; height: 180px; border-radius: 50%; position: relative; }
+  .pie-legend { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+  .pie-legend .item { display: flex; align-items: center; gap: 8px; }
+  .pie-legend .dot { width: 14px; height: 14px; border-radius: 3px; }
+
+  .hidden { display: none; }
+  .info-ficheiro { color: #86efac; font-size: 13px; margin-top: 8px; }
+
+  @media print {
+    body { background: #fff; color: #000; padding: 0; }
+    .card { background: #fff; border: 1px solid #ccc; box-shadow: none; page-break-inside: avoid; }
+    .card h2, .card h3, .stat .val { color: #000; }
+    .stat { background: #f5f5f5; border-color: #ccc; }
+    .no-print { display: none !important; }
+    table th { color: #333; }
+    table td { color: #000; }
+    .barra { background: #555; }
+    .barra.uber { background: #888; }
+    .barra.bolt { background: #4a9; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>📊 Analisador TVDE</h1>
+  <div class="sub">Exclusivo João Santos · Análise de dados Uber e Bolt</div>
+
+  <!-- Carregar backup -->
+  <div class="card no-print">
+    <h2>📂 Carregar backup</h2>
+    <div class="row">
+      <div>
+        <label>Ficheiro de backup (.json)</label>
+        <input type="file" id="fileInput" accept=".json">
+      </div>
+      <div style="flex:0">
+        <button class="btn-primary" onclick="processarFicheiro()">Carregar</button>
+      </div>
+    </div>
+    <div id="infoFicheiro" class="info-ficheiro"></div>
+  </div>
+
+  <!-- Visão mensal -->
+  <div class="card" id="cardMensal">
+    <h2>📅 Visão Mensal</h2>
+    <div class="row no-print">
+      <div>
+        <label>Mês</label>
+        <select id="mesSelect"></select>
+      </div>
+    </div>
+    <div class="grafico" id="graficoMensal"></div>
+    <table id="tabelaMensal">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Uber</th>
+          <th>Bolt</th>
+          <th>Total</th>
+          <th>Horas</th>
+          <th>Km</th>
+          <th>Comb.</th>
+          <th>Viagens</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+    <!-- Detalhe do dia -->
+  <div class="card hidden" id="cardDetalheDia">
+    <h2>🔍 Detalhe do dia: <span id="diaTitulo"></span></h2>
+    <div class="row">
+      <div class="stats">
+        <div class="stat uber"><div class="rot">⚫ Uber</div><div class="val" id="detUber">0€</div></div>
+        <div class="stat bolt"><div class="rot">🟢 Bolt</div><div class="val" id="detBolt">0€</div></div>
+        <div class="stat"><div class="rot">Horas Uber</div><div class="val" id="detUberHoras">0h</div></div>
+        <div class="stat"><div class="rot">Horas Bolt</div><div class="val" id="detBoltHoras">0h</div></div>
+        <div class="stat"><div class="rot">Km</div><div class="val" id="detKm">0</div></div>
+        <div class="stat"><div class="rot">Combustível</div><div class="val" id="detComb">0€</div></div>
+        <div class="stat"><div class="rot">Ganho/hora</div><div class="val" id="detGanhoHora">0€</div></div>
+        <div class="stat"><div class="rot">Média/viagem</div><div class="val" id="detMediaViagem">0€</div></div>
+      </div>
+    </div>
+    <div class="pie-wrap" style="margin-top:16px;">
+      <div class="pie" id="pieDia"></div>
+      <div class="pie-legend" id="pieLegenda"></div>
+    </div>
+
+    <h3 class="no-print">🚗 Viagens</h3>
+    <div class="row no-print">
+      <div>
+        <label>Viagens feitas</label>
+        <input type="number" id="viagensFeitas" value="0" min="0" onchange="guardarViagens()">
+      </div>
+      <div>
+        <label>Recusadas (cliente)</label>
+        <input type="number" id="recusadasCliente" value="0" min="0" onchange="guardarViagens()">
+      </div>
+      <div>
+        <label>Recusadas (por mim)</label>
+        <input type="number" id="recusadasMinhas" value="0" min="0" onchange="guardarViagens()">
+      </div>
+    </div>
+  </div>
+
+  <!-- Visão semanal -->
+  <div class="card" id="cardSemanal">
+    <h2>📆 Visão Semanal</h2>
+    <div class="row no-print">
+      <div>
+        <label>Semana do ano</label>
+        <select id="semanaSelect"></select>
+      </div>
+    </div>
+    <div class="grafico" id="graficoSemanal"></div>
+    <table id="tabelaSemanal">
+      <thead>
+        <tr>
+          <th>Dia</th>
+          <th>Uber</th>
+          <th>Bolt</th>
+          <th>Total</th>
+          <th>Horas</th>
+          <th>Km</th>
+          <th>Comb.</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div class="stats" id="statsSemana"></div>
+  </div>
+
+  <!-- Visão anual -->
+  <div class="card" id="cardAnual">
+    <h2>📈 Visão Anual</h2>
+    <div class="row no-print">
+      <div>
+        <label>Ano</label>
+        <select id="anoSelect"></select>
+      </div>
+    </div>
+    <div class="grafico" id="graficoAnual"></div>
+    <table id="tabelaAnual">
+      <thead>
+        <tr>
+          <th>Mês</th>
+          <th>Uber</th>
+          <th>Bolt</th>
+          <th>Total</th>
+          <th>Horas</th>
+          <th>Km</th>
+          <th>Comb.</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Uber vs Bolt -->
+  <div class="card" id="cardComparacao">
+    <h2>⚖️ Uber vs Bolt</h2>
+    <div class="row no-print">
+      <div>
+        <label>Comparar por</label>
+        <select id="compararPor" onchange="renderComparacao()">
+          <option value="dia">Dia selecionado</option>
+          <option value="semana" selected>Semana selecionada</option>
+          <option value="mes">Mês selecionado</option>
+        </select>
+      </div>
+    </div>
+    <div class="stats" id="statsComparacao"></div>
+  </div>
+
+  <!-- Exportar PDF -->
+  <div class="card no-print">
+    <h2>📄 Exportar PDF</h2>
+    <div class="row">
+      <div>
+        <label>Período</label>
+        <select id="pdfPeriodo">
+          <option value="semana">Semana</option>
+          <option value="mes">Mês</option>
+        </select>
+      </div>
+      <div style="flex:0">
+        <button class="btn-success" onclick="exportarPDF()">🖨️ Gerar PDF</button>
+      </div>
+    </div>
+    <p style="color:#9aa0a6;font-size:12px;margin-top:8px;">
+      Dica: na janela de impressão, escolhe <strong>"Guardar como PDF"</strong> em vez de impressora.
+    </p>
+  </div>
+
+  <div class="card" id="cardPdfHeader" style="display:none;text-align:center;">
+    <h1 style="color:#000;">Exclusivo João Santos</h1>
+    <div style="color:#333;font-size:14px;">TVDE · Relatório de Fecho</div>
+    <div style="color:#333;font-size:12px;margin-top:6px;" id="pdfSubtitulo"></div>
+  </div>
+
+</div>
+<script>
+/* ============================================================
+   ANALISADOR TVDE — Lê o backup .json da app
+   ============================================================ */
+
+let dados = null;          // dados do backup
+let diaSelecionado = null; // data do dia clicado
+let mesSelecionado = null;
+let semanaSelecionada = null;
+let anoSelecionado = null;
+
+/* ---------- CARREGAR FICHEIRO ---------- */
+
+function processarFicheiro() {
+  const input = document.getElementById('fileInput');
+  if (!input.files || input.files.length === 0) {
+    alert('Escolhe um ficheiro .json primeiro.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const b = JSON.parse(e.target.result);
+      if (!b.dados || !b.dados.dias) {
+        alert('Ficheiro inválido. Não parece ser um backup do Gestor TVDE.');
+        return;
+      }
+      dados = b;
+      document.getElementById('infoFicheiro').textContent =
+        '✅ Ficheiro carregado: ' + input.files[0].name +
+        ' (' + dados.dados.dias.length + ' dias registados)';
+      prepararFiltros();
+      renderTudo();
+    } catch(err) {
+      alert('Erro ao ler o ficheiro: ' + err.message);
+    }
+  };
+  reader.readAsText(input.files[0]);
+}
+
+/* ---------- PREPARAR FILTROS ---------- */
+
+function prepararFiltros() {
+  const dias = dados.dados.dias.slice().sort((a,b) => a.data.localeCompare(b.data));
+
+  // Meses
+  const meses = new Set();
+  dias.forEach(d => meses.add(d.data.substring(0,7)));
+  const mesSelect = document.getElementById('mesSelect');
+  mesSelect.innerHTML = [...meses].map(m => `<option value="${m}">${formatarMes(m)}</option>`).join('');
+  if (mesSelecionado) mesSelect.value = mesSelecionado;
+  mesSelecionado = mesSelect.value;
+  mesSelect.onchange = () => { mesSelecionado = mesSelect.value; renderMensal(); renderComparacao(); };
+
+  // Anos
+  const anos = new Set();
+  dias.forEach(d => anos.add(d.data.substring(0,4)));
+  const anoSelect = document.getElementById('anoSelect');
+  anoSelect.innerHTML = [...anos].sort().map(a => `<option value="${a}">${a}</option>`).join('');
+  anoSelecionado = anoSelect.value;
+  anoSelect.onchange = () => { anoSelecionado = anoSelect.value; renderAnual(); };
+
+  // Semanas
+  const semanas = new Set();
+  dias.forEach(d => semanas.add(obterSemanaISO(d.data)));
+  const semanaSelect = document.getElementById('semanaSelect');
+  semanaSelect.innerHTML = [...semanas].sort((a,b) => a-b).map(s => {
+    const ano = anoSelecionado || new Date().getFullYear();
+    return `<option value="${s}">Semana ${s}</option>`;
+  }).join('');
+  if (semanaSelecionada) semanaSelect.value = semanaSelecionada;
+  semanaSelecionada = semanaSelect.value;
+  semanaSelect.onchange = () => { semanaSelecionada = semanaSelect.value; renderSemanal(); renderComparacao(); };
+}
+
+/* ---------- UTILITÁRIOS ---------- */
+
+function obterSemanaISO(iso) {
+  const d = new Date(iso + 'T12:00:00');
+  const target = new Date(d.valueOf());
+  const dayNr = (d.getDay() + 6) % 7;
+  target.setDate(target.getDate() - dayNr + 3);
+  const firstThursday = target.valueOf();
+  target.setMonth(0, 1);
+  if (target.getDay() !== 4) {
+    target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+  }
+  return 1 + Math.ceil((firstThursday - target) / 604800000);
+}
+
+function formatarMes(isoMes) {
+  const [ano, mes] = isoMes.split('-');
+  const nomes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                 'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  return nomes[parseInt(mes)-1] + ' ' + ano;
+}
+
+function formatarData(iso) {
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function totaisDia(dia) {
+  const v = { ganhos:0, liquido:0, km:0, horas:0, litros:0, combustivel:0,
+              uberGanhos:0, uberHoras:0, boltGanhos:0, boltHoras:0,
+              viagensFeitas:0, recusadasCliente:0, recusadasMinhas:0 };
+  if (!dia || dia.folga) return v;
+  const comb = dia.custoCombustivel || 0;
+  const ganhos = dia.ganhos || 0;
+  return {
+    ganhos, liquido: ganhos - comb,
+    km: dia.kmPercorridos || 0, horas: dia.horas || 0,
+    litros: dia.litros || 0, combustivel: comb,
+    uberGanhos: dia.uberGanhos || 0, uberHoras: dia.uberHoras || 0,
+    boltGanhos: dia.boltGanhos || 0, boltHoras: dia.boltHoras || 0,
+    viagensFeitas: dia.viagensFeitas || 0,
+    recusadasCliente: dia.recusadasCliente || 0,
+    recusadasMinhas: dia.recusadasMinhas || 0
+  };
+}
+
+function somarTotais(listaDias) {
+  let t = { ganhos:0, liquido:0, km:0, horas:0, litros:0, combustivel:0,
+            uberGanhos:0, uberHoras:0, boltGanhos:0, boltHoras:0,
+            viagensFeitas:0, recusadasCliente:0, recusadasMinhas:0 };
+  listaDias.forEach(d => {
+    const x = totaisDia(d);
+    for (let k in t) t[k] += x[k];
+  });
+  return t;
+}
+
+/* ---------- RENDER PRINCIPAL ---------- */
+
+function renderTudo() {
+  renderMensal();
+  renderSemanal();
+  renderAnual();
+  renderComparacao();
+}
+
+/* ---------- VISÃO MENSAL ---------- */
+
+function renderMensal() {
+  const dias = dados.dados.dias
+    .filter(d => d.data.startsWith(mesSelecionado))
+    .sort((a,b) => a.data.localeCompare(b.data));
+
+  const tbody = document.querySelector('#tabelaMensal tbody');
+  tbody.innerHTML = dias.map(d => {
+    if (d.folga) {
+      return `<tr class="folga" onclick="selecionarDia('${d.data}')">
+        <td>${formatarData(d.data)}</td><td colspan="7">🛌 Folga</td></tr>`;
+    }
+    const t = totaisDia(d);
+    const sel = diaSelecionado === d.data ? ' selected' : '';
+    return `<tr class="${sel}" onclick="selecionarDia('${d.data}')">
+      <td>${formatarData(d.data)}</td>
+      <td>${t.uberGanhos.toFixed(2)}€</td>
+      <td>${t.boltGanhos.toFixed(2)}€</td>
+      <td>${t.ganhos.toFixed(2)}€</td>
+      <td>${t.horas.toFixed(1)}h</td>
+      <td>${t.km.toFixed(0)}</td>
+      <td>${t.combustivel.toFixed(2)}€</td>
+      <td>${t.viagensFeitas}</td>
+    </tr>`;
+  }).join('');
+
+  // Gráfico
+  const grafico = document.getElementById('graficoMensal');
+  if (dias.length === 0) { grafico.innerHTML = '<div style="color:#9aa0a6;margin:auto;">Sem dados para este mês.</div>'; return; }
+  const maxGanhos = Math.max(...dias.map(d => totaisDia(d).ganhos), 1);
+  grafico.innerHTML = dias.map(d => {
+    const t = totaisDia(d);
+    const h = (t.ganhos / maxGanhos) * 100;
+    const dia = d.data.substring(8,10);
+    return `<div class="barra" style="height:${h}%;" onclick="selecionarDia('${d.data}')">
+      <span class="label">${dia}</span></div>`;
+  }).join('');
+}
+
+/* ---------- SELECIONAR DIA ---------- */
+
+function selecionarDia(data) {
+  diaSelecionado = data;
+  const dia = dados.dados.dias.find(d => d.data === data);
+  if (!dia || dia.folga) {
+    document.getElementById('cardDetalheDia').classList.add('hidden');
+    return;
+  }
+  const t = totaisDia(dia);
+  document.getElementById('diaTitulo').textContent = formatarData(data);
+  document.getElementById('detUber').textContent = t.uberGanhos.toFixed(2) + '€';
+  document.getElementById('detBolt').textContent = t.boltGanhos.toFixed(2) + '€';
+  document.getElementById('detUberHoras').textContent = t.uberHoras.toFixed(1) + 'h';
+  document.getElementById('detBoltHoras').textContent = t.boltHoras.toFixed(1) + 'h';
+  document.getElementById('detKm').textContent = t.km.toFixed(0);
+  document.getElementById('detComb').textContent = t.combustivel.toFixed(2) + '€';
+  document.getElementById('detGanhoHora').textContent =
+    (t.horas > 0 ? (t.ganhos / t.horas).toFixed(2) : '0.00') + '€';
+  document.getElementById('detMediaViagem').textContent =
+    (t.viagensFeitas > 0 ? (t.ganhos / t.viagensFeitas).toFixed(2) : '0.00') + '€';
+
+  // Preencher campos de viagens
+  document.getElementById('viagensFeitas').value = t.viagensFeitas;
+  document.getElementById('recusadasCliente').value = t.recusadasCliente;
+  document.getElementById('recusadasMinhas').value = t.recusadasMinhas;
+
+  // Pie chart
+  const total = t.uberGanhos + t.boltGanhos;
+  const percU = total > 0 ? (t.uberGanhos / total) * 100 : 50;
+  const percB = 100 - percU;
+  const pie = document.getElementById('pieDia');
+  pie.style.background = `conic-gradient(#ffffff 0% ${percU}%, #34d186 ${percU}% 100%)`;
+
+  document.getElementById('pieLegenda').innerHTML = `
+    <div class="item"><div class="dot" style="background:#ffffff;"></div>⚫ Uber: ${t.uberGanhos.toFixed(2)}€ (${percU.toFixed(1)}%)</div>
+    <div class="item"><div class="dot" style="background:#34d186;"></div>🟢 Bolt: ${t.boltGanhos.toFixed(2)}€ (${percB.toFixed(1)}%)</div>
+  `;
+
+  document.getElementById('cardDetalheDia').classList.remove('hidden');
+
+  // Atualizar comparação se estiver no modo "dia"
+  if (document.getElementById('compararPor').value === 'dia') {
+    renderComparacao();
+  }
+
+  // Re-render mensal para marcar linha selecionada
+  renderMensal();
+}
+
+function guardarViagens() {
+  if (!diaSelecionado) return;
+  const dia = dados.dados.dias.find(d => d.data === diaSelecionado);
+  if (!dia) return;
+  dia.viagensFeitas = parseInt(document.getElementById('viagensFeitas').value) || 0;
+  dia.recusadasCliente = parseInt(document.getElementById('recusadasCliente').value) || 0;
+  dia.recusadasMinhas = parseInt(document.getElementById('recusadasMinhas').value) || 0;
+  // Guardar de volta no localStorage para não perder
+  try {
+    // Nota: como estamos a ler de um ficheiro, guardamos num backup separado
+    localStorage.setItem('analisadorTVDE_viagens', JSON.stringify(
+      Object.fromEntries(dados.dados.dias
+        .filter(d => d.viagensFeitas || d.recusadasCliente || d.recusadasMinhas)
+        .map(d => [d.data, { viagensFeitas: d.viagensFeitas, recusadasCliente: d.recusadasCliente, recusadasMinhas: d.recusadasMinhas }]))
+    ));
+  } catch(e) {}
+  renderMensal();
+}
+
+/* ---------- VISÃO SEMANAL ---------- */
+
+function renderSemanal() {
+  const ano = anoSelecionado || new Date().getFullYear();
+  const dias = dados.dados.dias
+    .filter(d => obterSemanaISO(d.data) == semanaSelecionada)
+    .sort((a,b) => a.data.localeCompare(b.data));
+
+  const tbody = document.querySelector('#tabelaSemanal tbody');
+  tbody.innerHTML = dias.map(d => {
+    if (d.folga) {
+      return `<tr class="folga"><td>${formatarData(d.data)}</td><td colspan="6">🛌 Folga</td></tr>`;
+    }
+    const t = totaisDia(d);
+    return `<tr onclick="selecionarDia('${d.data}')">
+      <td>${formatarData(d.data)}</td>
+      <td>${t.uberGanhos.toFixed(2)}€</td>
+      <td>${t.boltGanhos.toFixed(2)}€</td>
+      <td>${t.ganhos.toFixed(2)}€</td>
+      <td>${t.horas.toFixed(1)}h</td>
+      <td>${t.km.toFixed(0)}</td>
+      <td>${t.combustivel.toFixed(2)}€</td>
+    </tr>`;
+  }).join('');
+
+  // Gráfico
+  const grafico = document.getElementById('graficoSemanal');
+  const maxG = Math.max(...dias.map(d => totaisDia(d).ganhos), 1);
+  grafico.innerHTML = dias.map(d => {
+    const t = totaisDia(d);
+    const h = (t.ganhos / maxG) * 100;
+    const dia = d.data.substring(8,10);
+    return `<div class="barra" style="height:${h}%;" onclick="selecionarDia('${d.data}')">
+      <span class="label">${dia}</span></div>`;
+  }).join('');
+
+  // Stats da semana
+  const t = somarTotais(dias);
+  const statsDiv = document.getElementById('statsSemana');
+  const nMeses = dias.length;
+  statsDiv.innerHTML = `
+    <div class="stat"><div class="rot">Total ganhos</div><div class="val">${t.ganhos.toFixed(2)}€</div></div>
+    <div class="stat"><div class="rot">Líquido</div><div class="val">${t.liquido.toFixed(2)}€</div></div>
+    <div class="stat uber"><div class="rot">⚫ Uber</div><div class="val">${t.uberGanhos.toFixed(2)}€</div></div>
+    <div class="stat bolt"><div class="rot">🟢 Bolt</div><div class="val">${t.boltGanhos.toFixed(2)}€</div></div>
+    <div class="stat"><div class="rot">Horas</div><div class="val">${t.horas.toFixed(1)}h</div></div>
+    <div class="stat"><div class="rot">Km</div><div class="val">${t.km.toFixed(0)}</div></div>
+    <div class="stat"><div class="rot">Média/dia</div><div class="val">${(nMeses > 0 ? t.ganhos/nMeses : 0).toFixed(2)}€</div></div>
+    <div class="stat"><div class="rot">Ganho/hora</div><div class="val">${(t.horas > 0 ? t.ganhos/t.horas : 0).toFixed(2)}€</div></div>
+  `;
+}
+
+/* ---------- VISÃO ANUAL ---------- */
+
+function renderAnual() {
+  const dias = dados.dados.dias.filter(d => d.data.startsWith(anoSelecionado));
+  const porMes = {};
+  dias.forEach(d => {
+    const m = d.data.substring(0,7);
+    if (!porMes[m]) porMes[m] = [];
+    porMes[m].push(d);
+  });
+
+  const mesesOrdenados = Object.keys(porMes).sort();
+  const tbody = document.querySelector('#tabelaAnual tbody');
+  tbody.innerHTML = mesesOrdenados.map(m => {
+    const t = somarTotais(porMes[m]);
+    return `<tr>
+      <td>${formatarMes(m)}</td>
+      <td>${t.uberGanhos.toFixed(2)}€</td>
+      <td>${t.boltGanhos.toFixed(2)}€</td>
+      <td>${t.ganhos.toFixed(2)}€</td>
+      <td>${t.horas.toFixed(1)}h</td>
+      <td>${t.km.toFixed(0)}</td>
+      <td>${t.combustivel.toFixed(2)}€</td>
+    </tr>`;
+  }).join('');
+
+  const grafico = document.getElementById('graficoAnual');
+  const totaisMes = mesesOrdenados.map(m => somarTotais(porMes[m]).ganhos);
+  const maxG = Math.max(...totaisMes, 1);
+  grafico.innerHTML = mesesOrdenados.map((m, i) => {
+    const h = (totaisMes[i] / maxG) * 100;
+    const mes = m.substring(5,7);
+    return `<div class="barra" style="height:${h}%;">
+      <span class="label">${mes}</span></div>`;
+  }).join('');
+}
+
+/* ---------- COMPARAÇÃO UBER VS BOLT ---------- */
+
+function renderComparacao() {
+  const modo = document.getElementById('compararPor').value;
+  let lista = [];
+
+  if (modo === 'dia' && diaSelecionado) {
+    lista = dados.dados.dias.filter(d => d.data === diaSelecionado);
+  } else if (modo === 'semana') {
+    lista = dados.dados.dias.filter(d => obterSemanaISO(d.data) == semanaSelecionada);
+  } else if (modo === 'mes') {
+    lista = dados.dados.dias.filter(d => d.data.startsWith(mesSelecionado));
+  }
+
+  const t = somarTotais(lista);
+  const ganhoUberHora = t.uberHoras > 0 ? t.uberGanhos / t.uberHoras : 0;
+  const ganhoBoltHora = t.boltHoras > 0 ? t.boltGanhos / t.boltHoras : 0;
+  const total = t.uberGanhos + t.boltGanhos;
+  const percU = total > 0 ? (t.uberGanhos / total * 100) : 0;
+  const percB = total > 0 ? (t.boltGanhos / total * 100) : 0;
+  const diasAtivos = lista.filter(d => !d.folga).length;
+
+  document.getElementById('statsComparacao').innerHTML = `
+    <div class="stat uber"><div class="rot">⚫ Uber ganhos</div><div class="val">${t.uberGanhos.toFixed(2)}€</div><div style="color:#9aa0a6;font-size:12px;">${percU.toFixed(1)}% do total</div></div>
+    <div class="stat bolt"><div class="rot">🟢 Bolt ganhos</div><div class="val">${t.boltGanhos.toFixed(2)}€</div><div style="color:#9aa0a6;font-size:12px;">${percB.toFixed(1)}% do total</div></div>
+    <div class="stat uber"><div class="rot">⚫ Uber horas</div><div class="val">${t.uberHoras.toFixed(1)}h</div></div>
+    <div class="stat bolt"><div class="rot">🟢 Bolt horas</div><div class="val">${t.boltHoras.toFixed(1)}h</div></div>
+    <div class="stat uber"><div class="rot">⚫ Uber €/hora</div><div class="val">${ganhoUberHora.toFixed(2)}€</div></div>
+    <div class="stat bolt"><div class="rot">🟢 Bolt €/hora</div><div class="val">${ganhoBoltHora.toFixed(2)}€</div></div>
+    <div class="stat"><div class="rot">Dias ativos</div><div class="val">${diasAtivos}</div></div>
+    <div class="stat"><div class="rot">Média/dia</div><div class="val">${(diasAtivos > 0 ? t.ganhos/diasAtivos : 0).toFixed(2)}€</div></div>
+  `;
+}
+
+/* ---------- EXPORTAR PDF ---------- */
+
+function exportarPDF() {
+  const periodo = document.getElementById('pdfPeriodo').value;
+  let lista = [];
+  let subtitulo = '';
+
+  if (periodo === 'semana') {
+    lista = dados.dados.dias.filter(d => obterSemanaISO(d.data) == semanaSelecionada);
+    subtitulo = 'Semana ' + semanaSelecionada + ' · ' + anoSelecionado;
+  } else {
+    lista = dados.dados.dias.filter(d => d.data.startsWith(mesSelecionado));
+    subtitulo = formatarMes(mesSelecionado);
+  }
+
+  // Preencher cabeçalho do PDF
+  document.getElementById('pdfSubtitulo').textContent = subtitulo;
+  document.getElementById('cardPdfHeader').style.display = 'block';
+
+  // Esconder tudo o que é "no-print" já é tratado pelo CSS @media print
+
+  setTimeout(() => {
+    window.print();
+    // Depois de imprimir, esconder o cabeçalho
+    setTimeout(() => {
+      document.getElementById('cardPdfHeader').style.display = 'none';
+    }, 500);
+  }, 200);
+}
+
+/* ---------- INICIALIZAÇÃO ---------- */
+
+// Carregar viagens guardadas no localStorage (se existirem)
+window.addEventListener('load', function() {
+  try {
+    const guardadas = JSON.parse(localStorage.getItem('analisadorTVDE_viagens') || '{}');
+    if (dados) {
+      dados.dados.dias.forEach(d => {
+        if (guardadas[d.data]) {
+          d.viagensFeitas = guardadas[d.data].viagensFeitas || 0;
+          d.recusadasCliente = guardadas[d.data].recusadasCliente || 0;
+          d.recusadasMinhas = guardadas[d.data].recusadasMinhas || 0;
+        }
+      });
+    }
+  } catch(e) {}
+});
+</script>
+
+</body>
+</html>
